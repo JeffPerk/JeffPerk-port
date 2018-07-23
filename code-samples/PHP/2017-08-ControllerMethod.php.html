@@ -1,0 +1,63 @@
+<pre>
+    <code>
+    public function authenticate(AuthenticatePendingItemRequest $request, $pending_item)
+    {
+        $pendingItem = $this->pendingItemRepository->find($pending_item);
+        $admin = Auth::admin();
+
+        if ($request->authentication_status == AuthenticationStatus::NEEDS_ADDITIONAL_IMAGES) {
+            $this->commentRepository->createFromAdmin(
+                ['comment' => $request->get('needs_pictures')],
+                $pendingItem,
+                $admin,
+                "product_image_request"
+            );
+
+            $this->slack->alertChannel([
+                'title' => 'Requested Additional Images for  ' . $pendingItem->user->fullName . '\'s quotes.',
+                'text' => "<" . convertToSwipeBrowser(
+                    route(
+                        'admin.scanner.new-quote',
+                        ['user' => $pendingItem->user->id, 'pendingItem' => $pendingItem->id]
+                    )
+                ) . ">",
+                'description' => $request->get('needs_pictures'),
+                'channel' => '#' . $pendingItem->warehouse->cityInitials . "-showroom"
+            ]);
+        }
+
+        if ($request->authentication_status == AuthenticationStatus::OUTSIDE_AUTHENTICATOR) {
+            $authenticator = User::where('email', $request->get('authenticator_email'))->first();
+            $this->assignmentRepository->createFromAdmin($pendingItem, $authenticator, 'authenticator');
+            $this->commentRepository->createFromAdmin(
+                ['comment' => $request->get('comments_for_authenticator')],
+                $pendingItem,
+                $admin,
+                Comment::PRODUCT_OUTSIDE_AUTHENTICATION_TYPE
+            );
+        }
+
+        if ($request->authentication_status == AuthenticationStatus::BRAND_COMPLIANCE_ISSUES) {
+            $this->commentRepository->createFromAdmin(['comment' => $request->get('brand_compliant_message')], $pendingItem, $admin, "brand_compliance_issues");
+        }
+
+        $this->pendingItemRepository->updateAuthenticationStatus($pendingItem, $request->all(), $admin);
+        $this->userRepository->updateFromAdmin($pendingItem->user, $request->all());
+        $this->userRepository->notifyShowroomIfAllAuthenticatedAndResponded($pendingItem);
+        $pendingAuthentications = PendingItem::filterShowroomQuotesAwaitingAuthentication()->whereNull('authentication_status');
+
+        if ($pendingAuthentications->count()) {
+            return redirect()->route(
+                'admin.showroom-quotes.authentication',
+                $pendingAuthentications->first()->id
+            )->with([
+                'success' => 'Success',
+                'message' => 'You\'ve successfully marked quote ' . $pendingItem->id . ' as '
+                    . ucwords($pendingItem->authentication_status)
+            ]);
+        }
+
+        return redirect()->route('admin.showroom-quotes.authentications');
+    }
+    </code>
+</pre>

@@ -1,0 +1,102 @@
+<pre>
+    <code>
+    public function updateAsShowroom($admin, $pendingItem)
+    {
+        $pendingItem->is_showroom_quote = true;
+        $pendingItem->warehouse_id = $admin->warehouse_id;
+        $pendingItem->approved_at = Carbon::now();
+        $pendingItem->approver_id = $admin->id;
+        $pendingItem->updated_at = Carbon::now();
+        if ($pendingItem->hasSupplierRejected()) {
+            $pendingItem->accepted_offer_type = null;
+        }
+        $pendingItem->save();
+
+        return $pendingItem;
+    }
+
+    public function updateMany(array $input, \Illuminate\Contracts\Auth\Authenticatable $admin, $supplier)
+    {
+        $pendingItems = array_get($input, 'pending_items');
+        $isOutletMode = array_get($input, 'is_outlet_mode');
+        $approvedResponses = [];
+        $updatedItems = [];
+        $overrideApprovalResponseTypes = ['reject', 'outlet'];
+        $pendingItem = null;
+
+        foreach ($pendingItems as $itemInput) {
+            if (array_get($itemInput, 'selected') && array_get($itemInput, 'id')) {
+                $itemInput['is_outlet_mode'] = $isOutletMode;
+                $pendingItem = $this->model->find(array_get($itemInput, 'id'));
+                $pendingItem = $this->updatePendingItem($itemInput, $admin, $pendingItem);
+
+                if (($pendingItem && array_get($itemInput, 'approve')
+                    && ($isOutletMode || (
+                        !$isOutletMode && !in_array(array_get($itemInput, 'offer_type'), $overrideApprovalResponseTypes)
+                        )))) {
+                    $this->approvePendingItem($admin, $pendingItem);
+                    $approvedResponses[] = $pendingItem;
+                }
+                if ($pendingItem) {
+                    $updatedItems[] = $pendingItem;
+                }
+            }
+        }
+        $this->updateNeedsNotification($input, $admin, $supplier, $approvedResponses, $updatedItems);
+
+        return $pendingItem;
+    }
+
+    public function updatePendingItem($input, $admin, $pendingItem)
+    {
+        if (!$pendingItem) {
+            return null;
+        }
+        $isOutletMode = array_get($input, 'is_outlet_mode');
+        if (array_get($input, 'comment')) {
+            $this->commentRepository->createFromAdmin(
+                ['comment' => array_get($input, 'comment')],
+                $pendingItem,
+                $admin,
+                array_get($input, 'comment_type')
+            );
+        }
+
+        $pendingItem->name = array_get($input, 'name', $pendingItem->name);
+        $pendingItem->product_name = array_get($input, 'product_name');
+        $pendingItem->condition = array_get($input, 'condition');
+        $pendingItem->buyout_quote = array_get($input, 'buyout_quote');
+        $pendingItem->product_price = array_get($input, 'product_price');
+        $pendingItem->comment_to_customer = array_get($input, 'comment_to_customer') ?: null;
+        $pendingItem->retail_price = array_get($input, 'retail_price');
+        $pendingItem->season = array_get($input, 'season') ?: null;
+        $pendingItem->year = array_get($input, 'year') ?: null;
+        $pendingItem->is_exact_reference_product = array_get($input, 'is_exact_reference_product', false);
+        $pendingItem->consignment_estimate = array_get($input, 'consignment_estimate');
+        $pendingItem->brand_id = array_get($input, 'brand_id');
+        $pendingItem->predicted_type = array_get($input, 'predicted_type');
+
+        if (array_get($input, 'reference_product_id')) {
+            $pendingItem->reference_product_id = array_get($input, 'reference_product_id');
+        }
+
+        if (array_get($input, 'price_estimate_id')) {
+            $pendingItem->price_estimate_id = array_get($input, 'price_estimate_id');
+        }
+
+        $pendingItem->has_consignment_offer = false;
+        $pendingItem->has_buyout_offer = false;
+        $pendingItem->has_buyback_offer = false;
+        $pendingItem->has_outlet_offer = false;
+        $pendingItem->is_rejected = false;
+        $pendingItem->needs_more_info = false;
+        $pendingItem->is_outlet_quote = false;
+        $offerType = array_get($input, 'offer_type');
+
+        $pendingItem->save();
+
+        return $pendingItem;
+    }
+
+    </code>
+</pre>

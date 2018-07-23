@@ -1,0 +1,14 @@
+[
+  {
+    "JavaScript": {
+      "Dynamic Updates": "2018-06-DynamicUpdate.js.html",
+      "General": "2017-04-GeneralJS.js.html"
+    }
+  },
+  {
+    "PHP": {
+      "Repository Methods": "2017-11-RepositoryMethods.php.html",
+      "Controller Method": "2017-08-ControllerMethod.php.html"
+    }
+  }
+]

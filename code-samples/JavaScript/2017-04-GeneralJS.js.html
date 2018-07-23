@@ -1,0 +1,35 @@
+<pre>
+    <code>
+handleSuccessfulSearch = (response) => {
+  var currentResponseHits = response.results.aggs.top_titles.buckets;
+  var isOldSearch = this.page > 1;
+  var images = response.results.images;
+
+  if (isOldSearch === true) {
+    this.products = this.products.concat(currentResponseHits);
+    this.images = this.images.concat(images);
+  } else {
+    this.products = currentResponseHits;
+    this.images = images;
+  }
+
+  this.request = null;
+  this.searching = false;
+  this.searchResults = response;
+}
+
+importPendingItem = (searchTerm) => {
+  $.post("/admin/pricing/product-finder", {
+    search: searchTerm,
+    enableDescription: parseInt(0)
+  }).done(function (response) {
+    let titles = response.results.aggs.top_titles.buckets[0].key;
+    let condition = $("[data-condition='condition'] option:selected").val();
+    $.getJSON('/admin/pricing/price?titles%5b%5d='+ titles +'&condition=new')
+      .done(function (response) {
+        console.log(response);
+    });
+  });
+}
+    </code>
+</pre>
