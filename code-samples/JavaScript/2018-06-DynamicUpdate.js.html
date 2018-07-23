@@ -1,0 +1,96 @@
+<pre>
+    <code>
+        $(function () {
+  $('[data-option="showroom-print"]').click(function () {
+    disableButton($(this));
+    $('.messenger').addClass('hidden-print');
+    showroomMethods.convertQuotesToProducts()
+      .then(() => {
+        reenableButton($(this));
+        $('.radio').addClass('hidden');
+        print();
+      });
+  });
+
+  $('[data-request-payment]').each(function () {
+    showroomMethods.watchPaymentRequest();
+    showroomMethods.createLocalStorageForQuoteData();
+    $(this).change(() => {
+      showroomMethods.watchPaymentRequest();
+      showroomMethods.createLocalStorageForQuoteData();
+    });
+  });
+});
+
+let showroomMethods = {
+  watchPaymentRequest: () => {
+    let containsFalse = [];
+    let totalAmount = 0;
+
+    $('[data-request-payment]:checked').each(function () {
+      let quoteId = $(this).data('id');
+      let quoteBuyoutOffer = $(this).data('buyout-offer');
+      let quoteBonusForStoreCredit = $(this).data('bonus');
+      quoteBuyoutOffer = quoteBuyoutOffer.replace(',', '');
+      containsFalse.push($(this).val());
+      if ($(this).val() == true) {
+        $('[data-quote-id='+ quoteId +']').removeClass('hidden');
+      } else {
+        $('[data-quote-id='+ quoteId +']').addClass('hidden');
+      }
+      if (quoteBonusForStoreCredit) {
+        totalAmount += parseInt(quoteBuyoutOffer) + quoteBonusForStoreCredit;
+      }
+      if (containsFalse.includes("0")) {
+        $('[data-snippet=payment_overview]').removeClass('hidden');
+      } else {
+        $('[data-snippet=payment_overview]').addClass('hidden');
+      }
+    });
+    showroomMethods.countAndUpdatePaymentOverview(containsFalse);
+    $('.store_credit_amount').text(totalAmount.toLocaleString('en', {style: 'currency', currency: 'USD'}));
+  },
+
+  countAndUpdatePaymentOverview: (paymentRequests) => {
+    let paymentsRequested = 0;
+    let storeCreditRequested = 0;
+    paymentRequests.forEach((i) => {
+      if (i == 1) {
+        paymentsRequested++;
+      } else {
+        storeCreditRequested++;
+      }
+    });
+    if (storeCreditRequested > 1) {
+      $('.singular-plural').text('quotes')
+    } else {
+      $('.singular-plural').text('quote');
+    }
+    $('.store_credit_items').text(storeCreditRequested);
+  },
+
+  convertQuotesToProducts: () => {
+    return new Promise((resolve, reject) => {
+      $.post('/admin/showroom-quotes/convert-to-products', {
+        _method: 'POST',
+        data   : localStorage.getItem('quotes')
+      }).success(function (response) {
+        resolve('successful');
+      });
+    });
+  },
+
+  createLocalStorageForQuoteData: () => {
+    let quotes = [];
+    $('[data-request-payment]:checked').each(function () {
+      let quote = {};
+      quote.id = $(this).data('id');
+      quote.value = $(this).val();
+      quote.type = "showroom";
+      quotes.push(quote);
+    });
+    localStorage.setItem('quotes', JSON.stringify(quotes));
+  }
+}
+    </code>
+</pre>
